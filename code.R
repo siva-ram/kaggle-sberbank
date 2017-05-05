@@ -1,7 +1,9 @@
 
-train <- read.csv("F:\\kaggle\\train.csv", header=T, na.strings = "NA")
-test <- read.csv("F:\\kaggle\\test.csv", header=T, na.strings = "NA")
-macro <- read.csv("F:\\kaggle\\macro.csv", header=T, na.strings = "NA")
+library(data.table)
+setwd("C:/Kaggle/Sber Bank")
+train = read.csv("train.csv")
+test = read.csv("test.csv")
+macro = read.csv("macro.csv")
 
 train$id <- NULL
 test$id <- NULL
@@ -31,13 +33,14 @@ predict(LGDprune,test_merge)
 
 write.table(data.table(id=test_merge$id, price_doc=predict(LGDprune,test_merge)), "submission.csv", sep=",", dec=".", quote=FALSE, row.names=FALSE)
 
-ds=train_merge[,sapply(train_merge, function(x) sum(is.na(x)))/length(train_merge$price_doc)<.2]
+ds=train_merge[,sapply(train_merge, function(x) sum(is.na(x)))/length(train_merge$price_doc)<.1]
+
 #random forest
 gc()
 ds <-ds[, sapply(ds, function(col) (is.numeric(col) || length(unique(col)) < 25))]
 summary(ds)
 library(randomForest)
-rf_imputed<-rfImpute(price_doc~.,ds)
+#rf_imputed<-rfImpute(price_doc~.,ds)
 rf <- randomForest(price_doc~., data=dat2,importance=TRUE, ntree=50)
 summary(rf)
 
@@ -58,10 +61,13 @@ dat2 <- sapply(ds, function(x){
   }
 }
 )
+
 colnames(dat2)
+
 View(test_merge[, names(test_merge) %in% colnames(dat2)])
 
 dat2_test<-  sapply(test_merge[, names(test_merge) %in% colnames(dat2)], function(x){
+  
   if(is.numeric(x)){
     impute.med(x)
   } else {
@@ -70,8 +76,20 @@ dat2_test<-  sapply(test_merge[, names(test_merge) %in% colnames(dat2)], functio
 }
 )
 
+dat2 = as.data.frame(dat2)
+
+price_doc = dat2$price_doc
+
+dat2$price_doc = NULL
+
+dat2 = as.data.frame(cbind(dat2,price_doc))
+
+rf <- randomForest(price_doc~., data=dat2,importance=TRUE, ntree=50)
+
+summary(rf)
 
 imp <- importance(rf, type=1)
+
 featureImportance <- data.frame(Feature=row.names(imp), Importance=imp[,1])
 library(ggplot2)
 p <- ggplot(featureImportance, aes(x=reorder(Feature, Importance), y=Importance)) +
@@ -84,11 +102,18 @@ p <- ggplot(featureImportance, aes(x=reorder(Feature, Importance), y=Importance)
   theme(axis.text=element_text(size=12),plot.title=element_text(size=18))
 p
 
+pred=predict(rf,dat2_test)
+
+sub2 = as.data.frame(cbind(test$id,pred))
+
+write.csv(sub2,file="sub2.csv")
 
 predict(rf,as.matrix(test_merge[, names(test_merge) %in% colnames(dat2)]))
+
 length(test_merge$id)
 
 length(predict(LGDprune,test_merge))
+
 length(predict(LGDprune,data=test_merge))
 
 
@@ -110,10 +135,40 @@ train_merge[ , -col_names]
 
 
 (l <- sapply(train_merge, function(x) is.factor(x)))
+
 m <- train_merge[, l]
+
 ifelse(n <- sapply(m, function(x) length(levels(x))) == 1, "DROP", "NODROP")
 
+id = 1:length(imp)
+
+data = as.data.frame(cbind(id,imp))
+
+data = with(data, data[order(data$`%IncMSE`),])
+
+oid = data$id
+
+oid
 
 
 
+
+
+grep("price_doc", colnames(dat2))
+
+n = 225
+
+dat2t = dat2[,oid[(length(imp)-n):length(imp)]]
+
+dat2t$price_doc = price_doc
+
+dat2_testt = dat2_test[,oid[(length(imp)-n):length(imp)]]
+
+rf <- randomForest(price_doc~., data=dat2t,importance=TRUE, ntree=50)
+
+pred=predict(rf,dat2_testt)
+
+sub2 = as.data.frame(cbind(test$id,pred))
+
+write.csv(sub2,file="top225Rf.csv")
 
