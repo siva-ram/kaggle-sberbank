@@ -1,5 +1,3 @@
-install.packages("data.table")
-library(data.table)
 
 train <- read.csv("F:\\kaggle\\train.csv", header=T, na.strings = "NA")
 test <- read.csv("F:\\kaggle\\test.csv", header=T, na.strings = "NA")
